@@ -1,0 +1,36 @@
+name: qrbridge_app
+description: QRBridge - Android App for File Sharing via QR Codes
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  file_picker: ^6.1.1
+  qr_flutter: ^4.1.0
+  pretty_qr_code: ^3.0.0
+  mobile_scanner: ^3.5.6
+  encrypt: ^5.0.1
+  flutter_secure_storage: ^9.0.0
+  path_provider: ^2.1.1
+  permission_handler: ^11.0.1
+  lottie: ^2.7.0
+  provider: ^6.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/animations/
+    - assets/images/
+
