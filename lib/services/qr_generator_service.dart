@@ -12,6 +12,62 @@ class QRGeneratorService {
     FileInfoModel fileInfo, {
     bool encrypt = false,
     String? password,
+    bool asSingle = true,
+  }) async {
+    if (asSingle) {
+      return [_generateSingleQRFromFile(fileInfo, encrypt: encrypt, password: password)];
+    } else {
+      return _generateQRsFromFileInChunks(fileInfo, encrypt: encrypt, password: password);
+    }
+  }
+
+  Future<String> _generateSingleQRFromFile(
+    FileInfoModel fileInfo, {
+    bool encrypt = false,
+    String? password,
+  }) async {
+    try {
+      // Read file data
+      final file = File(fileInfo.path);
+      if (!await file.exists()) {
+        throw Exception('File not found: ${fileInfo.path}');
+      }
+
+      Uint8List fileData = await file.readAsBytes();
+
+      // Encrypt if required
+      if (encrypt && password != null && password.isNotEmpty) {
+        fileData = await _encryptionService.encryptData(fileData, password);
+      }
+
+      // Convert to base64
+      String base64Data = base64Encode(fileData);
+
+      // Create file metadata
+      Map<String, dynamic> metadata = {
+        'name': fileInfo.name,
+        'size': fileInfo.size,
+        'type': fileInfo.type,
+        'encrypted': encrypt,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+
+      Map<String, dynamic> qrData = {
+        'metadata': metadata,
+        'data': base64Data,
+        'chunks': 1,
+        'chunk': 0,
+      };
+      return jsonEncode(qrData);
+    } catch (e) {
+      throw Exception('Failed to generate single QR code: $e');
+    }
+  }
+
+  Future<List<String>> _generateQRsFromFileInChunks(
+    FileInfoModel fileInfo, {
+    bool encrypt = false,
+    String? password,
   }) async {
     try {
       // Read file data
@@ -45,42 +101,52 @@ class QRGeneratorService {
       int chunkSize = maxQRDataSize - metadataJson.length - 100; // Buffer for chunk info
 
       List<String> qrCodes = [];
+      int totalChunks = (base64Data.length / chunkSize).ceil();
 
-      if (base64Data.length <= chunkSize) {
-        // Single QR code
+      for (int i = 0; i < totalChunks; i++) {
+        int start = i * chunkSize;
+        int end = (start + chunkSize < base64Data.length)
+            ? start + chunkSize
+            : base64Data.length;
+
+        String chunkData = base64Data.substring(start, end);
+
         Map<String, dynamic> qrData = {
           'metadata': metadata,
-          'data': base64Data,
-          'chunks': 1,
-          'chunk': 0,
+          'data': chunkData,
+          'chunks': totalChunks,
+          'chunk': i,
         };
+
         qrCodes.add(jsonEncode(qrData));
-      } else {
-        // Multiple QR codes
-        int totalChunks = (base64Data.length / chunkSize).ceil();
-        
-        for (int i = 0; i < totalChunks; i++) {
-          int start = i * chunkSize;
-          int end = (start + chunkSize < base64Data.length) 
-              ? start + chunkSize 
-              : base64Data.length;
-          
-          String chunkData = base64Data.substring(start, end);
-          
-          Map<String, dynamic> qrData = {
-            'metadata': metadata,
-            'data': chunkData,
-            'chunks': totalChunks,
-            'chunk': i,
-          };
-          
-          qrCodes.add(jsonEncode(qrData));
-        }
       }
 
       return qrCodes;
     } catch (e) {
-      throw Exception('Failed to generate QR codes: $e');
+      throw Exception('Failed to generate QR codes in chunks: $e');
+    }
+  }
+
+  Future<int> getQRCodeCount(FileInfoModel fileInfo) async {
+    try {
+      final file = File(fileInfo.path);
+      if (!await file.exists()) {
+        return 0;
+      }
+      Uint8List fileData = await file.readAsBytes();
+      String base64Data = base64Encode(fileData);
+      Map<String, dynamic> metadata = {
+        'name': fileInfo.name,
+        'size': fileInfo.size,
+        'type': fileInfo.type,
+        'encrypted': false,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      String metadataJson = jsonEncode(metadata);
+      int chunkSize = maxQRDataSize - metadataJson.length - 100;
+      return (base64Data.length / chunkSize).ceil();
+    } catch (e) {
+      return 0;
     }
   }
 

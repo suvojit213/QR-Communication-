@@ -45,35 +45,36 @@ class _QRCarouselState extends State<QRCarousel> {
           ),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'QR Code ${_currentIndex + 1} of ${widget.qrCodes.length}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+              if (widget.qrCodes.length > 1)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'QR Code ${_currentIndex + 1} of ${widget.qrCodes.length}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _currentIndex > 0 ? _previousQR : null,
-                        icon: const Icon(Icons.arrow_back_ios),
-                        iconSize: 20,
-                      ),
-                      IconButton(
-                        onPressed: _currentIndex < widget.qrCodes.length - 1 
-                            ? _nextQR 
-                            : null,
-                        icon: const Icon(Icons.arrow_forward_ios),
-                        iconSize: 20,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: _currentIndex > 0 ? _previousQR : null,
+                          icon: const Icon(Icons.arrow_back_ios),
+                          iconSize: 20,
+                        ),
+                        IconButton(
+                          onPressed: _currentIndex < widget.qrCodes.length - 1 
+                              ? _nextQR 
+                              : null,
+                          icon: const Icon(Icons.arrow_forward_ios),
+                          iconSize: 20,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               const SizedBox(height: 20),
               SizedBox(
                 height: 300,
