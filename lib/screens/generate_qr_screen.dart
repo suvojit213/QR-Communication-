@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
@@ -21,7 +22,6 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
   FileInfoModel? _selectedFile;
   bool _isGenerating = false;
   String _generationStatus = '';
-  final QRGeneratorService _qrService = QRGeneratorService();
 
   @override
   Widget build(BuildContext context) {
@@ -308,62 +308,33 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
       _generationStatus = '';
     });
 
-    try {
-      final fileProvider = Provider.of<FileProvider>(context, listen: false);
-      
-      List<String> qrData = await _qrService.generateQRFromFile(
-        _selectedFile!,
-        encrypt: fileProvider.isEncryptionEnabled,
-        password: fileProvider.encryptionPassword,
-        asSingle: false, // Always generate multiple QR codes
-      );
+    final fileProvider = Provider.of<FileProvider>(context, listen: false);
+    final port = ReceivePort();
 
-      final downloadsDir = await getDownloadsDirectory();
-      final zipFilePath = '${downloadsDir!.path}/${_selectedFile!.name}.zip';
-      final encoder = ZipFileEncoder();
-      encoder.create(zipFilePath);
+    await Isolate.spawn(
+      _generateAndZipQRCodesIsolate,
+      {
+        'port': port.sendPort,
+        'fileInfo': _selectedFile!,
+        'encrypt': fileProvider.isEncryptionEnabled,
+        'password': fileProvider.encryptionPassword,
+      },
+    );
 
-      for (int i = 0; i < qrData.length; i++) {
-        final qrImage = await QrPainter(
-          data: qrData[i],
-          version: QrVersions.auto,
-          gapless: false,
-        ).toImageData(200);
-
-        final imageBytes = qrImage!.buffer.asUint8List();
-        final image = img.decodeImage(imageBytes);
-        encoder.addArchiveFile(ArchiveFile('qr_code_$i.png', image!.lengthInBytes, img.encodePng(image)));
+    port.listen((message) {
+      if (message is String) {
+        setState(() {
+          _isGenerating = false;
+          _generationStatus = message;
+        });
+      } else if (message is Map<String, dynamic>) {
+        setState(() {
+          _isGenerating = false;
+          _generationStatus = message['status'];
+        });
+        fileProvider.addFileToHistory(message['fileInfo']);
       }
-
-      encoder.close();
-
-      setState(() {
-        _isGenerating = false;
-        _generationStatus = 'QR codes zipped and saved to: $zipFilePath';
-      });
-
-      // Add to history
-      final updatedFile = FileInfoModel(
-        name: _selectedFile!.name,
-        path: _selectedFile!.path,
-        size: _selectedFile!.size,
-        type: _selectedFile!.type,
-        dateCreated: _selectedFile!.dateCreated,
-        isEncrypted: fileProvider.isEncryptionEnabled,
-      );
-      
-      fileProvider.addFileToHistory(updatedFile);
-
-    } catch (e) {
-      setState(() {
-        _isGenerating = false;
-        _generationStatus = 'Error: $e';
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating QR codes: $e')),
-      );
-    }
+    });
   }
 
   IconData _getFileIcon(String type) {
@@ -395,3 +366,54 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
   }
 }
 
+void _generateAndZipQRCodesIsolate(Map<String, dynamic> args) async {
+  final port = args['port'] as SendPort;
+  final fileInfo = args['fileInfo'] as FileInfoModel;
+  final encrypt = args['encrypt'] as bool;
+  final password = args['password'] as String?;
+  final qrService = QRGeneratorService();
+
+  try {
+    List<String> qrData = await qrService.generateQRFromFile(
+      fileInfo,
+      encrypt: encrypt,
+      password: password,
+      asSingle: false,
+    );
+
+    final downloadsDir = await getDownloadsDirectory();
+    final zipFilePath = '${downloadsDir!.path}/${fileInfo.name}.zip';
+    final encoder = ZipFileEncoder();
+    encoder.create(zipFilePath);
+
+    for (int i = 0; i < qrData.length; i++) {
+      final qrImage = await QrPainter(
+        data: qrData[i],
+        version: QrVersions.auto,
+        gapless: false,
+      ).toImageData(200);
+
+      final imageBytes = qrImage!.buffer.asUint8List();
+      final image = img.decodeImage(imageBytes);
+      encoder.addArchiveFile(ArchiveFile('qr_code_$i.png', image!.lengthInBytes, img.encodePng(image)));
+    }
+
+    encoder.close();
+
+    final updatedFile = FileInfoModel(
+      name: fileInfo.name,
+      path: fileInfo.path,
+      size: fileInfo.size,
+      type: fileInfo.type,
+      dateCreated: fileInfo.dateCreated,
+      isEncrypted: encrypt,
+    );
+
+    port.send({
+      'status': 'QR codes zipped and saved to: $zipFilePath',
+      'fileInfo': updatedFile,
+    });
+  } catch (e) {
+    port.send('Error: $e');
+  }
+}
