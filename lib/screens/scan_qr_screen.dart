@@ -346,15 +346,16 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
 
       if (result != null && result.files.single.path != null) {
         final String imagePath = result.files.single.path!;
-        final BarcodeCapture? capture = await cameraController.analyzeImage(imagePath);
-        if (capture != null) {
-          _onQRCodeDetected(capture);
-        }
+        // The analyzeImage method returns a bool, and the actual scan result is
+        // delivered through the onDetect callback.
+        await cameraController.analyzeImage(imagePath);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error scanning image: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error scanning image: $e')),
+        );
+      }
     }
   }
 
