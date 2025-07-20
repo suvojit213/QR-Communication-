@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/generate_qr_screen.dart';
-import 'screens/scan_qr_screen.dart';
+import 'screens/select_zip_screen.dart';
 import 'screens/settings_screen.dart';
 import 'provider/file_provider.dart';
 
@@ -59,7 +59,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const GenerateQRScreen(),
-    const ScanQRScreen(),
+    const SelectZipScreen(),
     const SettingsScreen(),
   ];
 
@@ -102,8 +102,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 label: 'Generate',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.qr_code_scanner),
-                label: 'Scanner',
+                icon: Icon(Icons.folder_zip),
+                label: 'Select ZIP',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.settings),
@@ -116,4 +116,3 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 }
-
