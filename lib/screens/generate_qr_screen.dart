@@ -332,7 +332,7 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
 
         final imageBytes = qrImage!.buffer.asUint8List();
         final image = img.decodeImage(imageBytes);
-        encoder.addFile(ArchiveFile('qr_code_$i.png', image!.lengthInBytes, img.encodePng(image)));
+        encoder.addArchiveFile(ArchiveFile('qr_code_$i.png', image!.lengthInBytes, img.encodePng(image)));
       }
 
       encoder.close();
