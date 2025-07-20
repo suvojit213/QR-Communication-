@@ -15,7 +15,7 @@ class QRGeneratorService {
     bool asSingle = true,
   }) async {
     if (asSingle) {
-      return [_generateSingleQRFromFile(fileInfo, encrypt: encrypt, password: password)];
+      return [await _generateSingleQRFromFile(fileInfo, encrypt: encrypt, password: password)];
     } else {
       return _generateQRsFromFileInChunks(fileInfo, encrypt: encrypt, password: password);
     }
