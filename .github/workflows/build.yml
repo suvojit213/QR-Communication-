@@ -20,8 +20,7 @@ jobs:
         with:
           flutter-version: '3.x' # Use a specific Flutter version or '3.x' for the latest 3.x.x
 
-      - name: Generate Flutter project files
-        run: flutter create .
+      
 
       - name: Get Flutter dependencies
         run: flutter pub get
