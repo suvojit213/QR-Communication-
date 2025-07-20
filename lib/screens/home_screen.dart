@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../provider/file_provider.dart';
+import 'package:qrbridge_app/screens/select_zip_screen.dart';
 import '../widgets/file_tile.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -82,11 +83,14 @@ class HomeScreen extends StatelessWidget {
                     Expanded(
                       child: _buildActionCard(
                         context,
-                        'Scan QR',
-                        'Decode QR to files',
-                        Icons.qr_code_scanner,
+                        'Select ZIP',
+                        'Reconstruct from ZIP',
+                        Icons.folder_zip,
                         Colors.green,
-                        () => _navigateToTab(context, 2),
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SelectZipScreen()),
+                        ),
                       ),
                     ),
                   ],

@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:archive/archive_io.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:image/image.dart' as img;
 import '../provider/file_provider.dart';
 import '../services/qr_generator_service.dart';
-import '../widgets/qr_carousel.dart';
 import '../models/file_info_model.dart';
 
 class GenerateQRScreen extends StatefulWidget {
@@ -15,10 +19,8 @@ class GenerateQRScreen extends StatefulWidget {
 
 class _GenerateQRScreenState extends State<GenerateQRScreen> {
   FileInfoModel? _selectedFile;
-  List<String> _generatedQRCodes = [];
   bool _isGenerating = false;
-  bool _generateSingleQR = true;
-  int _qrCodeCount = 1;
+  String _generationStatus = '';
   final QRGeneratorService _qrService = QRGeneratorService();
 
   @override
@@ -106,14 +108,12 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
                 ] else ...[
                   _buildFileInfo(),
                   const SizedBox(height: 20),
-                  _buildQRGenerationOptions(),
-                  const SizedBox(height: 20),
-                  if (_generatedQRCodes.isEmpty && !_isGenerating)
+                  if (!_isGenerating)
                     _buildGenerateButton()
-                  else if (_isGenerating)
-                    _buildLoadingWidget()
                   else
-                    Expanded(child: QRCarousel(qrCodes: _generatedQRCodes)),
+                    _buildLoadingWidget(),
+                  const SizedBox(height: 20),
+                  Text(_generationStatus),
                 ],
               ],
             ),
@@ -184,67 +184,12 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
                 onPressed: () {
                   setState(() {
                     _selectedFile = null;
-                    _generatedQRCodes.clear();
+                    _generationStatus = '';
                   });
                 },
                 icon: const Icon(Icons.close, color: Colors.grey),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQRGenerationOptions() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'QR Code Generation',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Generate Single QR Code'),
-              Switch(
-                value: _generateSingleQR,
-                onChanged: (value) {
-                  setState(() {
-                    _generateSingleQR = value;
-                    _updateQRCodeCount();
-                  });
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _generateSingleQR
-                ? 'A single QR code will be generated for the entire file.'
-                : 'Multiple QR codes will be generated. Total: $_qrCodeCount',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
           ),
         ],
       ),
@@ -287,9 +232,9 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
                     const SizedBox(height: 20),
                   ],
                   ElevatedButton.icon(
-                    onPressed: _generateQRCode,
+                    onPressed: _generateAndZipQRCodes,
                     icon: const Icon(Icons.qr_code),
-                    label: const Text('Generate QR Code'),
+                    label: const Text('Generate QR ZIP'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -319,7 +264,7 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
           CircularProgressIndicator(),
           SizedBox(height: 20),
           Text(
-            'Generating QR codes...',
+            'Generating and zipping QR codes...',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey,
@@ -345,7 +290,7 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
             type: file.extension ?? 'unknown',
             dateCreated: DateTime.now(),
           );
-          _updateQRCodeCount();
+          _generationStatus = '';
         });
       }
     } catch (e) {
@@ -355,41 +300,45 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
     }
   }
 
-  Future<void> _updateQRCodeCount() async {
-    if (_selectedFile != null) {
-      if (_generateSingleQR) {
-        setState(() {
-          _qrCodeCount = 1;
-        });
-      } else {
-        int count = await _qrService.getQRCodeCount(_selectedFile!);
-        setState(() {
-          _qrCodeCount = count;
-        });
-      }
-    }
-  }
-
-  Future<void> _generateQRCode() async {
+  Future<void> _generateAndZipQRCodes() async {
     if (_selectedFile == null) return;
 
     setState(() {
       _isGenerating = true;
+      _generationStatus = '';
     });
 
     try {
       final fileProvider = Provider.of<FileProvider>(context, listen: false);
       
-      List<String> qrCodes = await _qrService.generateQRFromFile(
+      List<String> qrData = await _qrService.generateQRFromFile(
         _selectedFile!,
         encrypt: fileProvider.isEncryptionEnabled,
         password: fileProvider.encryptionPassword,
-        asSingle: _generateSingleQR,
+        asSingle: false, // Always generate multiple QR codes
       );
 
+      final downloadsDir = await getDownloadsDirectory();
+      final zipFilePath = '${downloadsDir!.path}/${_selectedFile!.name}.zip';
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFilePath);
+
+      for (int i = 0; i < qrData.length; i++) {
+        final qrImage = await QrPainter(
+          data: qrData[i],
+          version: QrVersions.auto,
+          gapless: false,
+        ).toImageData(200);
+
+        final image = img.decodeImage(qrImage!.buffer.asUint8List());
+        encoder.addFile(ArchiveFile('qr_code_$i.png', image!.length, img.encodePng(image)));
+      }
+
+      encoder.close();
+
       setState(() {
-        _generatedQRCodes = qrCodes;
         _isGenerating = false;
+        _generationStatus = 'QR codes zipped and saved to: $zipFilePath';
       });
 
       // Add to history
@@ -400,7 +349,6 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
         type: _selectedFile!.type,
         dateCreated: _selectedFile!.dateCreated,
         isEncrypted: fileProvider.isEncryptionEnabled,
-        qrCodes: qrCodes,
       );
       
       fileProvider.addFileToHistory(updatedFile);
@@ -408,10 +356,11 @@ class _GenerateQRScreenState extends State<GenerateQRScreen> {
     } catch (e) {
       setState(() {
         _isGenerating = false;
+        _generationStatus = 'Error: $e';
       });
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating QR code: $e')),
+        SnackBar(content: Text('Error generating QR codes: $e')),
       );
     }
   }
