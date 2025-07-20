@@ -58,7 +58,14 @@ class QRGeneratorService {
         'chunks': 1,
         'chunk': 0,
       };
-      return jsonEncode(qrData);
+
+      String qrDataString = jsonEncode(qrData);
+
+      if (qrDataString.length > maxQRDataSize) {
+        throw Exception('File is too large to be encoded in a single QR code. Please use the multiple QR code option.');
+      }
+
+      return qrDataString;
     } catch (e) {
       throw Exception('Failed to generate single QR code: $e');
     }

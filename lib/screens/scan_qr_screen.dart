@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../provider/file_provider.dart';
 import '../services/qr_scanner_service.dart';
 import '../models/file_info_model.dart';
@@ -33,6 +34,10 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          IconButton(
+            onPressed: _pickAndScanImage,
+            icon: const Icon(Icons.image),
+          ),
           IconButton(
             onPressed: () {
               cameraController.toggleTorch();
@@ -188,7 +193,7 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
                           ),
                           SizedBox(height: 15),
                           Text(
-                            'Point camera at QR code',
+                            'Point camera at QR code or select an image',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.grey,
@@ -333,6 +338,24 @@ class _ScanQRScreenState extends State<ScanQRScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _pickAndScanImage() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(type: FileType.image);
+
+      if (result != null && result.files.single.path != null) {
+        final String imagePath = result.files.single.path!;
+        final BarcodeCapture? capture = await cameraController.analyzeImage(imagePath);
+        if (capture != null) {
+          _onQRCodeDetected(capture);
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error scanning image: $e')),
+      );
+    }
   }
 
   void _onQRCodeDetected(BarcodeCapture capture) async {
